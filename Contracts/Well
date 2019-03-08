@@ -1,0 +1,129 @@
+pragma solidity ^0.4.24;
+import "./SafeMath.sol";
+
+contract Well{
+    mapping(uint256 => well) wells;
+    uint256 wellCounter; //number of wells registered
+
+    struct well{
+        uint256 ID;
+        bool registered;
+        address owner;
+        bool active;
+        address[] materials;
+        uint256[] extracted;
+        mapping (address => bool) previouslyExtracted; //tracks previosly extracted materals
+        uint256 externalID; //legacy ID
+    }
+    
+    /**
+    * @dev register a well
+    */
+    function registerWell(uint256 _externalID, address _owner, bool _active) public returns (bool){
+        wellCounter++;
+        wells[wellCounter].ID = wellCounter;
+        wells[wellCounter].registered = true;
+        wells[wellCounter].owner = _owner;
+        wells[wellCounter].active = _active;
+        wells[wellCounter].externalID = _externalID;
+        emit RegisterWell(wellCounter, _externalID, _owner, _active);
+        return true;
+    }
+    
+    /**
+    * @dev returns well registration
+    */
+    function isRegistered(uint256 _ID) public view returns (bool){
+        return wells[_ID].registered;
+    }
+    
+    /**
+    * @dev returns well owner
+    */
+    function getWellOwner(uint256 _ID) public view returns (address){
+        return wells[_ID].owner;
+    }
+    
+    /**
+    * @dev returns well activation status
+    */
+    function isWellActive(uint256 _ID) public view returns (bool){
+        return wells[_ID].active;
+    }
+    
+    //number of wells
+    function getnumberWells() public view returns (uint) {
+        return wellCounter;
+    }
+    
+    /**
+    * @dev change owner of a well
+    */
+    function changeWellOwner(uint256 _id, address _owner) public returns (bool){
+        require(wells[_id].owner == msg.sender);
+        address oldOwner = wells[_id].owner;
+        wells[_id].owner = _owner;
+        emit ChangeWellOwner(_id, oldOwner, _owner);
+        return true;
+    }
+    
+    /**
+    * @dev activate a well
+    */
+    function activateWell(uint256 _id) public returns (bool){
+        require(wells[_id].owner == msg.sender);
+        require(wells[_id].active == false);
+        wells[_id].active = true;
+        emit ActivateWell(_id);
+        return true;
+    }
+    
+    /**
+    * @dev de-activate a well
+    */
+    function deActivateWell(uint256 _id) public returns (bool){
+        require(wells[_id].owner == msg.sender);
+        require(wells[_id].active == true);
+        wells[_id].active = false;
+        emit DeActivateWell(_id);
+        return true;
+    }
+    
+    /**
+    * Event for recording a new well
+    * @param _ID unique identifier of the well
+    * @param _externalID external/legacy well ID
+    * @param _owner owner of the well
+    * @param _active active or inactive
+    */
+    event RegisterWell(uint256 _ID, uint256 _externalID, address _owner, bool _active);
+    
+    /**
+    * Event for recording a well ownership change
+    * @param _wellID well ID/number
+    * @param _oldOwner old owner
+    * @param _newOwner new owner
+    */
+    event ChangeWellOwner(uint256 _wellID, address _oldOwner, address _newOwner);
+    
+    /**
+    * Event for recording a well activation
+    * @param _wellID well ID/number
+    */
+    event ActivateWell(uint256 _wellID);
+    
+    /**
+    * Event for recording a well de-activation
+    * @param _wellID well ID/number
+    */
+    event DeActivateWell(uint256 _wellID);
+    
+}
+
+
+
+
+
+
+
+
