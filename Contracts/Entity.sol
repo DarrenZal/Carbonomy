@@ -2,7 +2,6 @@ pragma solidity ^0.4.24;
 
 contract Entity{
     mapping(address => entity) entities; //maps an address to an entity object
-    mapping(address => uint) entityIndex; 
     address[] entityAddresses; //list of all registered addresses
 
     struct entity{
@@ -21,7 +20,6 @@ contract Entity{
         entities[msg.sender].jurisdiction = jurisdiction;
         entities[msg.sender].registered = true;
         entityAddresses.push(msg.sender);
-        entityIndex[msg.sender] = entityAddresses.length-1;
         return entities[msg.sender].registered;
     }
 
@@ -30,6 +28,7 @@ contract Entity{
     */
     function unRegister(uint _index) public returns (bool){
         require(entities[msg.sender].registered == true);
+        require(entityAddresses[_index] == msg.sender);
         if (removeEntity(_index) == false) return false; //remove from list of registered entities
         entities[msg.sender].registered = false;
     }
