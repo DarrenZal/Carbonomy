@@ -1,5 +1,5 @@
 pragma solidity ^0.4.24;
-import "./SafeMath.sol";
+import "browser/SafeMath.sol";
 
 contract Well{
     mapping(uint256 => well) wells;
@@ -7,7 +7,6 @@ contract Well{
 
     struct well{
         uint256 ID;
-        bool registered;
         address owner;
         bool active;
         address[] materials;
@@ -22,7 +21,6 @@ contract Well{
     function registerWell(uint256 _externalID, address _owner, bool _active) public returns (bool){
         wellCounter++;
         wells[wellCounter].ID = wellCounter;
-        wells[wellCounter].registered = true;
         wells[wellCounter].owner = _owner;
         wells[wellCounter].active = _active;
         wells[wellCounter].externalID = _externalID;
@@ -31,10 +29,11 @@ contract Well{
     }
     
     /**
-    * @dev returns well registration
+    * @dev returns data for a well
     */
-    function isRegistered(uint256 _ID) public view returns (bool){
-        return wells[_ID].registered;
+    function getWellData(uint256 _wellID) public returns (address, bool, address[], uint256[], uint256){
+        well thisWell = wells[_wellID];
+        return (thisWell.owner, thisWell.active, thisWell.materials, thisWell.extracted, thisWell.externalID);
     }
     
     /**
@@ -44,6 +43,7 @@ contract Well{
         return wells[_ID].owner;
     }
     
+    //doesn't return previouslyExtracted which is an internal helper field)
     /**
     * @dev returns well activation status
     */
@@ -51,8 +51,10 @@ contract Well{
         return wells[_ID].active;
     }
     
-    //number of wells
-    function getnumberWells() public view returns (uint) {
+    /**
+    * @dev number of wells
+    */
+    function getNumberWells() public view returns (uint) {
         return wellCounter;
     }
     
@@ -117,13 +119,4 @@ contract Well{
     * @param _wellID well ID/number
     */
     event DeActivateWell(uint256 _wellID);
-    
 }
-
-
-
-
-
-
-
-
