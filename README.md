@@ -1,2 +1,2 @@
-# Petronomy
-Virtual petroleum economy
+# Carbonomy
+Virtual carbon economy
