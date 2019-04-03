@@ -6,15 +6,15 @@ contract Entity{
 
     struct entity{
         bool registered;
-        bytes businessName;
-        bytes jurisdiction;
+        string businessName;
+        string jurisdiction;
         uint index; //internal ID
     }
 
     /**
     * @dev allows entity registration
     */
-    function register(bytes _businessName, bytes jurisdiction) public returns (bool){
+    function register(string _businessName, string jurisdiction) public returns (bool){
         require(entities[msg.sender].registered == false);
         entities[msg.sender].businessName = _businessName;
         entities[msg.sender].jurisdiction = jurisdiction;
@@ -43,14 +43,14 @@ contract Entity{
     /**
     * @dev returns entity jurisdiction
     */
-    function getJurisdiction(address _address) public view returns (bytes){
+    function getJurisdiction(address _address) public view returns (string){
         return entities[_address].jurisdiction;
     }
     
     /**
     * @dev allows changing of entity jurisdiction
     */
-    function changeJurisdiction(bytes _jurisdiction) public view returns (bytes){
+    function changeJurisdiction(string _jurisdiction) public view returns (string){
         entities[msg.sender].jurisdiction = _jurisdiction;
         return entities[msg.sender].jurisdiction;
     }
@@ -58,14 +58,14 @@ contract Entity{
     /**
     * @dev returns entity business name
     */
-    function getBusinessName(address _address) public view returns (bytes){
+    function getBusinessName(address _address) public view returns (string){
         return entities[_address].businessName;
     }
     
     /**
     * @dev allows changing of entity business name
     */
-    function changeBusinessName(bytes _businessName) public view returns (bytes){
+    function changeBusinessName(string _businessName) public view returns (string){
         entities[msg.sender].businessName = _businessName;
         return entities[msg.sender].businessName;
     }
