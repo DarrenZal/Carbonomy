@@ -2,9 +2,7 @@
 //For example when an oil refinery pays a carbon tax on gasoline, 
 //this contract could 'stamp' their balance of gas, 
 //the stamp would be transfered along with the gas when they sell the gas to a gas station.
-//If tax is paid up stream, 'proof of tax paid' can be carried down the supply chain
-//This could be particularly useful if a distributor is collecting materials from different suppliers, 
-//some of which has had 
+//If tax is paid up stream, 'proof of tax paid' can be carried down the supply chain.
 
 pragma solidity ^0.4.24;
 import "./SafeMath.sol";
