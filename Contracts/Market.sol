@@ -1,8 +1,8 @@
 //A marketplace/exchange for both fungible and non-fungible assets
 
-pragma solidity ^0.4.24;
-import "./Fungible/Token.sol"; //fungible
-import "./NonFungible/ERC721.sol"; //non-fungible
+pragma solidity ^0.4.25;
+import "./Token.sol"; //fungible
+import "./ERC721.sol"; //non-fungible
 pragma experimental ABIEncoderV2;
 
 contract Market{
@@ -24,12 +24,13 @@ contract Market{
         uint256 price;
         uint256 quantity;
         uint256 percentUpFront;
-        bytes taxType;
+        string transType; //transaction type ex: 'resale' or 'consumption'
+        string taxType;
         uint256 tax;
         address taxAddress;
         bool buyerDisputed;
         bool sellerDisputed;
-        bytes tokenType; //ERC20, ERC721 etc
+        string tokenType; //ERC20, ERC721 etc
     }
 
     // an array to hold all active escrow contracts
@@ -37,96 +38,96 @@ contract Market{
 
     /**
     * @dev Creates escrow contract, either buyer or seller can create one
-    * @param _tokenAddress token contract address
-    * @param _seller address of seller leave blank to allow anyone to sign as seller
-    * @param _buyer address of buyer leave blank to allow anyone to sign as buyer
-    * @param _arbiter address of arbiter, leave blank to put creater of escrow as arbiter
+    * @param _addresses addresses of token contract (_addresses[0]), buyer (_addresses[1]), seller (_addresses[2]), and arbiter (_addresses[3]). *leave counterparty blank to allow anyone to sign as counterparty
     * @param _price total cost of the deal
     * @param _amount total ownership tokens of the deal
     * @param _percentUpFront percent of total cost to be paid to seller once both parties sign
     * @param _release if the creator releases up front, the counterparty is free to complete the exchange by signing and releasing 
+    * @param _transType transaction type ex: 'resale' or 'consumption'
+    * @param _taxType type of tax ex 'carbon' or 'consumption'
     * @param _tax tax payment
-    * @param _taxAddress tax collection address
     */
-    function createEscrowERC20(address _tokenAddress, address _seller, address _buyer, address _arbiter, uint256 _amount, uint256 _price, uint256 _percentUpFront, bool _release, bytes _taxType, uint256 _tax, address _taxAddress) public payable returns (bool){
+    function createEscrowERC20(address[] _addresses, uint256 _amount, uint256 _price, uint256 _percentUpFront, bool _release, string _transType, string _taxType, uint256 _tax) public payable returns (bool){
         require(0 <= _percentUpFront && _percentUpFront <= 100);
-        Token tokenInstance = Token(_tokenAddress);
-        if(msg.sender == _seller){
-            require(tokenInstance.allowance( _seller,  thisAddress) >= _amount);
-            require(tokenInstance.balanceOf(_seller) >= _amount);
-            tokenInstance.transferFrom(_seller, thisAddress, _amount);
-            escrowContracts.push(escrow(_tokenAddress, 0, false, true, false, false, false, _release, _seller, _buyer, _arbiter, _price, _amount, _percentUpFront, _taxType, _tax, _taxAddress, false, false, "ERC20"));
-            emit EscrowSigned(escrowContracts.length-1, _seller);
+        Token tokenInstance = Token(_addresses[0]);
+        //if sender if seller
+        if(msg.sender == _addresses[2]){
+            require(tokenInstance.allowance( _addresses[2],  thisAddress) >= _amount);
+            require(tokenInstance.balanceOf(_addresses[2]) >= _amount);
+            tokenInstance.transferFrom(_addresses[1], thisAddress, _amount);
+            escrowContracts.push(escrow(_addresses[0], 0, false, true, false, false, false, _release, _addresses[2], _addresses[1], _addresses[3], _price, _amount, _percentUpFront, _transType, _taxType, _tax, _addresses[4], false, false, "ERC20"));
+            emit EscrowSigned(escrowContracts.length-1, _addresses[2]);
         } else {
-            require(msg.sender == _buyer);
+            require(msg.sender == _addresses[1]);
             require(msg.value == SafeMath.add(_price,_tax));
-            escrowContracts.push(escrow(_tokenAddress, 0, true, false, false, false, _release, false, _seller, _buyer, _arbiter, _price, _amount, _percentUpFront, _taxType, _tax, _taxAddress, false, false, "ERC20"));
-            emit EscrowSigned(escrowContracts.length-1, _buyer);
+            escrowContracts.push(escrow(_addresses[0], 0, false, true, false, false, _release, false, _addresses[2], _addresses[1], _addresses[3], _price, _amount, _percentUpFront, _transType, _taxType, _tax, _addresses[4], false, false, "ERC20"));
+            emit EscrowSigned(escrowContracts.length-1, _addresses[1]);
         }
     }
     
     /**
     * @dev Creates escrow contract, either buyer or seller can create one
-    * @param _tokenAddress token contract address
     * @param _tokenID ID of ERC721 token
-    * @param _seller address of seller leave blank to allow anyone to sign as seller
-    * @param _buyer address of buyer leave blank to allow anyone to sign as buyer
-    * @param _arbiter address of arbiter, leave blank to put creater of escrow as arbiter
+    * @param _addresses addresses of token contract (_addresses[0]), buyer (_addresses[1]), seller (_addresses[2]), and arbiter (_addresses[3]). *leave counterparty blank to allow anyone to sign as counterparty
     * @param _price total cost of the deal
     * @param _percentUpFront percent of total cost to be paid to seller once both parties sign
+    * @param _transType transaction type ex: 'resale' or 'consumption'
+    * @param _taxType type of tax ex 'carbon' or 'consumption' 
     * @param _tax tax payment
-    * @param _taxAddress tax collection address
     */
-    function createEscrowERC721(address _tokenAddress, uint256 _tokenID, address _seller, address _buyer, address _arbiter, uint256 _price, uint256 _percentUpFront, bytes _taxType, uint256 _tax, address _taxAddress) public payable returns (bool){
+    function createEscrowERC721(address[] _addresses, uint256 _tokenID, uint256 _price, uint256 _percentUpFront, bool _release, string _transType, string _taxType, uint256 _tax) public payable returns (bool){
         require(0 <= _percentUpFront && _percentUpFront <= 100);
-        ERC721 tokenInstance = ERC721(_tokenAddress);
-        if(msg.sender == _seller){
+        ERC721 tokenInstance = ERC721(_addresses[0]);
+        if(msg.sender == _addresses[2]){
             require(tokenInstance.getApproved(_tokenID) == thisAddress);
             //**make sure this contract can accept NFT
-            tokenInstance.transferFrom(_seller, thisAddress, _tokenID);
-            escrowContracts.push(escrow(_tokenAddress, _tokenID, false, true, false, false, false, false, _seller, _buyer, _arbiter, _price, 1, _percentUpFront, _taxType, _tax, _taxAddress, false, false, "ERC721"));
-            emit EscrowSigned(escrowContracts.length-1, _seller);
+            tokenInstance.transferFrom(_addresses[2], thisAddress, _tokenID);
+            escrowContracts.push(escrow(_addresses[0], _tokenID, false, true, false, false, false, _release, _addresses[2], _addresses[1], _addresses[3], _price, 1, _percentUpFront, _transType, _taxType, _tax, _addresses[4], false, false, "ERC721"));
+            emit EscrowSigned(escrowContracts.length-1, _addresses[2]);
         } else {
-            require(msg.sender == _buyer);
+            require(msg.sender == _addresses[1]);
             require(msg.value == SafeMath.add(_price,_tax));
-            escrowContracts.push(escrow(_tokenAddress, _tokenID, true, false, false, false, false, false, _seller, _buyer, _arbiter, _price, 1, _percentUpFront, _taxType, _tax, _taxAddress, false, false, "ERC721"));
-            emit EscrowSigned(escrowContracts.length-1, _buyer);
+            escrowContracts.push(escrow(_addresses[0], _tokenID, false, true, false, false, false, _release, _addresses[2], _addresses[1], _addresses[3], _price, 1, _percentUpFront, _transType, _taxType, _tax, _addresses[4], false, false, "ERC721"));
+            emit EscrowSigned(escrowContracts.length-1, _addresses[1]);
         }
     }
 
+//*********************!!!!!!!
     /**
     * @dev completes the escrow contract, transfering payment to seller and ownership to buyer, both parties must release
     * @param _index specifies which escrow contract to release
     */
     function releaseEscrow(uint256 _index) public returns (bool){
         require(_index < escrowContracts.length);
-        escrow thisContract = escrowContracts[_index];
-        if(thisContract.buyer == msg.sender && thisContract.buyerSigned == true && thisContract.buyerUnSigned == false){
-            thisContract.buyerReleased = true;
-        } else if(thisContract.seller == msg.sender && thisContract.sellerSigned == true && thisContract.buyerUnSigned == false){
-            thisContract.sellerReleased = true;
+        //if buyer has signed and not unsigned, mark buyerReleased as True
+        if(escrowContracts[_index].buyer == msg.sender && escrowContracts[_index].buyerSigned == true && escrowContracts[_index].buyerUnSigned == false){
+            escrowContracts[_index].buyerReleased = true;
+        //if seller has signed and not unsigned, mark sellerReleased as True
+        } else if(escrowContracts[_index].seller == msg.sender && escrowContracts[_index].sellerSigned == true && escrowContracts[_index].sellerUnSigned == false){
+            escrowContracts[_index].sellerReleased = true;
         } else return false;
-        address tokenAddress = thisContract.tokenAddress;
-        if(thisContract.buyerReleased && thisContract.sellerReleased){
-            require(thisContract.buyerDisputed == false && thisContract.sellerDisputed == false);
-            if (keccak256(thisContract.tokenType) == keccak256("ERC20")){
-                 Token(tokenAddress).transfer(thisContract.buyer, thisContract.quantity);
-            } else if (keccak256(thisContract.tokenType) == keccak256("ERC721")){
-                ERC721(tokenAddress).transferFrom(thisContract.seller, thisContract.buyer, thisContract.tokenID);
+        address tokenAddress = escrowContracts[_index].tokenAddress;
+        if(escrowContracts[_index].buyerReleased && escrowContracts[_index].sellerReleased){
+            require(escrowContracts[_index].buyerDisputed == false && escrowContracts[_index].sellerDisputed == false);
+            if (keccak256(escrowContracts[_index].tokenType) == keccak256("ERC20")){
+                 Token(tokenAddress).transfer(escrowContracts[_index].buyer, escrowContracts[_index].quantity);
+            } else if (keccak256(escrowContracts[_index].tokenType) == keccak256("ERC721")){
+                ERC721(tokenAddress).transferFrom(escrowContracts[_index].seller, escrowContracts[_index].buyer, escrowContracts[_index].tokenID);
             }
             //transfer funds to the seller minus how much was paid up front
-            thisContract.seller.transfer(SafeMath.div(SafeMath.mul(100-thisContract.percentUpFront,thisContract.price),100));
+            escrowContracts[_index].seller.transfer(SafeMath.div(SafeMath.mul(100-escrowContracts[_index].percentUpFront,escrowContracts[_index].price),100));
             //pay taxes, which were collected when the buyer signed if the contract had taxIncluded == true
-            if(thisContract.tax > 0){
-                address escrowTaxAddress = thisContract.taxAddress;
-                escrowTaxAddress.transfer( thisContract.tax );
+            if(escrowContracts[_index].tax > 0){
+                address escrowTaxAddress = escrowContracts[_index].taxAddress;
+                escrowTaxAddress.transfer( escrowContracts[_index].tax );
             }
-            emit EscrowFinalized(thisContract.tokenAddress, thisContract.tokenID, thisContract.seller, thisContract.buyer, thisContract.arbiter, escrowContracts[_index].price, thisContract.quantity, thisContract.percentUpFront, thisContract.taxType, thisContract.tax, thisContract.taxAddress, thisContract.tokenType);
+            escrow thisContract = escrowContracts[_index];
+            emit EscrowFinalized(escrowContracts[_index].tokenAddress, escrowContracts[_index].tokenID, thisContract.seller, thisContract.buyer, thisContract.price, thisContract.quantity, thisContract.percentUpFront, thisContract.transType, thisContract.taxType, thisContract.tax, thisContract.taxAddress, thisContract.tokenType);
             removeEscrow(_index);
         }
         return true;
     }
-
+    
     /**
     * @dev Allows buyer and seller to unRelease Escrow
     * @param _index specifies which escrow contract to unRelease
@@ -143,11 +144,21 @@ contract Market{
 
     /**
     * @dev If an address has created and signed the escrow contract putting in Alice's name as the other party, Alice will need to sign to validate the contract
-    * Or, if the other party created an escrow contract with a blank address (address(0)), Alice can fill that slot and sign
+    * Or, if the other party created an escrow contract with a blank address (address(0)), Alice can fill that slot and sign.
+    * The parameters of the contract are passed in to make sure the sender is signing the correct contract
     * @param _index specifies which escrow contract to sign
+    * @param _addresses [tokenAddress, seller, buyer, arbiter, taxAddress]
+    * @param _nums [tokenID, price, quantity, percentUpFront, tax]
+    * @param _bools [buyerSigned, sellerSigned, buyerUnSigned, sellerUnSigned, buyerReleased, sellerReleased, buyerDisputed,sellerDisputed]
+    * @param _strings [transType, taxType, tokenType]
+    * 
     */
-    function signEscrow(uint256 _index) public payable returns (bool){
+    function signEscrow(uint256 _index, address[5] _addresses, uint256[5] _nums, bool[8] _bools, string[3] _strings) public payable returns (bool){
         require(_index < escrowContracts.length);
+        require(escrowContracts[_index].tokenAddress == _addresses[0] && escrowContracts[_index].seller == _addresses[1] && escrowContracts[_index].buyer == _addresses[2] && escrowContracts[_index].arbiter == _addresses[3] && escrowContracts[_index].taxAddress == _addresses[4]);
+        require(escrowContracts[_index].tokenID == _nums[0] && escrowContracts[_index].price == _nums[1] && escrowContracts[_index].quantity == _nums[2] && escrowContracts[_index].percentUpFront == _nums[3] && escrowContracts[_index].tax == _nums[4]);
+        require(escrowContracts[_index].buyerSigned == _bools[0] && escrowContracts[_index].sellerSigned == _bools[1] && escrowContracts[_index].buyerUnSigned == _bools[2] && escrowContracts[_index].sellerUnSigned == _bools[3] && escrowContracts[_index].buyerReleased == _bools[4] && escrowContracts[_index].sellerReleased == _bools[5] && escrowContracts[_index].buyerDisputed == _bools[6] && escrowContracts[_index].sellerDisputed == _bools[7]);
+        require(keccak256(escrowContracts[_index].transType) == keccak256(_strings[0]) && keccak256(escrowContracts[_index].taxType) == keccak256(_strings[1]) && keccak256(escrowContracts[_index].tokenType) == keccak256(_strings[2]));
         if((escrowContracts[_index].buyer == msg.sender || escrowContracts[_index].buyer == address(0)) && escrowContracts[_index].buyerSigned == false){
             if(escrowContracts[_index].tax > 0){
                 require(msg.value == SafeMath.add(escrowContracts[_index].price,escrowContracts[_index].tax));
@@ -182,14 +193,23 @@ contract Market{
         }
         else return false;
     }
-    
+
     //sign and finalize in same transaction
     /**
     * @dev Allows an address to sign and finalize escrow in the same transaction
+    * The parameters of the contract are passed in to make sure the sender is signing the correct contract
     * @param _index specifies which escrow contract to sign
+    * @param _addresses [tokenAddress, seller, buyer, arbiter, taxAddress]
+    * @param _nums [tokenID, price, quantity, percentUpFront, tax]
+    * @param _bools [buyerSigned, sellerSigned, buyerUnSigned, sellerUnSigned, buyerReleased, sellerReleased, buyerDisputed,sellerDisputed]
+    * @param _strings [transType, taxType, tokenType]
     */
-    function signAndReleaseEscrow(uint256 _index) public payable returns (bool){
+    function signAndReleaseEscrow(uint256 _index, address[5] _addresses, uint256[5] _nums, bool[8] _bools, string[3] _strings) public payable returns (bool){
         require(_index < escrowContracts.length);
+        require(escrowContracts[_index].tokenAddress == _addresses[0] && escrowContracts[_index].seller == _addresses[1] && escrowContracts[_index].buyer == _addresses[2] && escrowContracts[_index].arbiter == _addresses[3] && escrowContracts[_index].taxAddress == _addresses[4]);
+        require(escrowContracts[_index].tokenID == _nums[0] && escrowContracts[_index].price == _nums[1] && escrowContracts[_index].quantity == _nums[2] && escrowContracts[_index].percentUpFront == _nums[3] && escrowContracts[_index].tax == _nums[4]);
+        require(escrowContracts[_index].buyerSigned == _bools[0] && escrowContracts[_index].sellerSigned == _bools[1] && escrowContracts[_index].buyerUnSigned == _bools[2] && escrowContracts[_index].sellerUnSigned == _bools[3] && escrowContracts[_index].buyerReleased == _bools[4] && escrowContracts[_index].sellerReleased == _bools[5] && escrowContracts[_index].buyerDisputed == _bools[6] && escrowContracts[_index].sellerDisputed == _bools[7]);
+        require(keccak256(escrowContracts[_index].transType) == keccak256(_strings[0]) && keccak256(escrowContracts[_index].taxType) == keccak256(_strings[1]) && keccak256(escrowContracts[_index].tokenType) == keccak256(_strings[2]));
         escrow thisContract = escrowContracts[_index];
         address tokenAddress = thisContract.tokenAddress;
         if((thisContract.buyer == msg.sender || thisContract.buyer == address(0)) && thisContract.buyerSigned == false){
@@ -221,14 +241,14 @@ contract Market{
             thisContract.sellerSigned = true;
             emit EscrowSigned(_index, msg.sender);
         } else return false;
-        
+
         //Finalize escrow
         if(thisContract.buyer == msg.sender && thisContract.buyerSigned == true && thisContract.buyerUnSigned == false){
             thisContract.buyerReleased = true;
-        } else if(thisContract.seller == msg.sender && thisContract.sellerSigned == true && thisContract.buyerUnSigned == false){
+        } else if(thisContract.seller == msg.sender && thisContract.sellerSigned == true && thisContract.sellerUnSigned == false){
             thisContract.sellerReleased = true;
         } else return false;
-        if(escrowContracts[_index].buyerReleased && thisContract.sellerReleased){
+        if(escrowContracts[_index].buyerSigned && thisContract.sellerReleased){
             require(escrowContracts[_index].buyerDisputed == false && thisContract.sellerDisputed == false);
             if (keccak256(thisContract.tokenType) == keccak256("ERC20")){
                  Token(tokenAddress).transfer(thisContract.buyer, thisContract.quantity);
@@ -242,13 +262,12 @@ contract Market{
                 address escrowTaxAddress = thisContract.taxAddress;
                 escrowTaxAddress.transfer( thisContract.tax );
             }
-            emit EscrowFinalized(thisContract.tokenAddress, thisContract.tokenID, thisContract.seller, thisContract.buyer, thisContract.arbiter, thisContract.price, thisContract.quantity, thisContract.percentUpFront, thisContract.taxType, thisContract.tax, thisContract.taxAddress, thisContract.tokenType);
+            emit EscrowFinalized(thisContract.tokenAddress, thisContract.tokenID, thisContract.seller, thisContract.buyer, thisContract.price, thisContract.quantity, thisContract.percentUpFront, thisContract.transType, thisContract.taxType, thisContract.tax, thisContract.taxAddress, thisContract.tokenType);
             removeEscrow(_index);
         }
         return true;
-        
     }
-
+    
     /**
     * @dev Allows the buyer and seller to unsign a contract, it also automatically deletes the contract once both have unsigned
     * this allows buyer and seller to delete the contract without arbitration
@@ -260,7 +279,7 @@ contract Market{
         address tokenAddress = escrowContracts[_index].tokenAddress;
         if(escrowContracts[_index].buyer == msg.sender && escrowContracts[_index].buyerSigned == true){
             escrowContracts[_index].buyerUnSigned = true;
-            if (escrowContracts[_index].sellerSigned == false){
+            if (escrowContracts[_index].buyerSigned == false){
                 //seller never signed, can refund buyer his money (minus percent paid up front) and delete the contract
                 //If tax was put in escrow up front, refund the tax as well
                 if(escrowContracts[_index].tax > 0){
@@ -382,7 +401,7 @@ contract Market{
         if(_paymentToBuyer > 0){
             thisEscrow.buyer.transfer(_paymentToBuyer);
         }
-        emit EscrowArbitrated(thisEscrow.tokenAddress, thisEscrow.tokenID, thisEscrow.arbiter, thisEscrow.seller, thisEscrow.buyer, _amountToSeller, _amountToBuyer, _paymentToSeller, _paymentToBuyer, thisEscrow.percentUpFront, thisEscrow.tokenType);
+        emit EscrowArbitrated(thisEscrow.tokenAddress, thisEscrow.tokenID, thisEscrow.arbiter, thisEscrow.seller, thisEscrow.buyer, _amountToSeller, _amountToBuyer, _paymentToSeller, _paymentToBuyer, thisEscrow.percentUpFront, thisEscrow.tokenType, thisEscrow.transType);
         removeEscrow(_index);
         return true;
     }
@@ -414,19 +433,21 @@ contract Market{
     /**
     * @dev returns token address, ID, and type being traded
     */
-    function getEscrowTokenData() public view returns (address[], uint256[], bytes[]){
+    function getEscrowTokenData() public view returns (address[], uint256[], string[], string[]){
         address[] memory tokenAddress = new address[](escrowContracts.length);
         uint256[] memory tokenID = new uint256[](escrowContracts.length);
-        bytes[] memory tokenType = new bytes[](escrowContracts.length);
+        string[] memory tokenType = new string[](escrowContracts.length);
+        string[] memory saleType = new string[](escrowContracts.length);
         for (uint i=0; i<escrowContracts.length; i++) {
             //Give contracts that either have buyer/address = msg.sender, or have buyer/address as blank (signaling they are open offers)
             if (msg.sender == escrowContracts[i].seller || msg.sender == escrowContracts[i].buyer || escrowContracts[i].seller == address(0) || escrowContracts[i].buyer == address(0)){
                 tokenAddress[i] = escrowContracts[i].tokenAddress;
                 tokenID[i] = escrowContracts[i].tokenID;
                 tokenType[i] = escrowContracts[i].tokenType;
+                saleType[i] = escrowContracts[i].transType;
             }
         }
-        return (tokenAddress, tokenID, tokenType);
+        return (tokenAddress, tokenID, tokenType, saleType);
     }
     
     /**
@@ -507,19 +528,19 @@ contract Market{
     event EscrowSigned(uint256 _escrowIndex, address _signer);
     
     /**
-    * Event for recording sale
+    * Event for recording completion of transaction
     * @param _tokenAddress token contract address
     * @param _seller address of seller leave blank to allow anyone to sign as seller
     * @param _buyer address of buyer leave blank to allow anyone to sign as buyer
-    * @param _arbiter address of arbiter, leave blank to put creater of escrow as arbiter
     * @param _price total cost of the deal
     * @param _amount total ownership tokens of the deal
     * @param _percentUpFront percent of total cost to be paid to seller once both parties sign
+    * @param _transType the type/purpose of transaction ('resale' or 'consumption')
     * @param _taxType description of the tax
     * @param _tax tax payment in ether
     * @param _taxAddress tax collection address
     */
-    event EscrowFinalized(address _tokenAddress, uint256 _tokenID, address _seller, address _buyer, address _arbiter, uint256 _price, uint256 _amount, uint256 _percentUpFront, bytes _taxType, uint256 _tax, address _taxAddress, bytes tokenType);
+    event EscrowFinalized(address _tokenAddress, uint256 _tokenID, address _seller, address _buyer, uint256 _price, uint256 _amount, uint256 _percentUpFront, string _transType, string _taxType, uint256 _tax, address _taxAddress, string tokenType);
 
     /**
     * Event for recording arbitration of a contract
@@ -532,6 +553,8 @@ contract Market{
     * @param _paymentToSeller funds to give seller
     * @param _paymentToBuyer funds to give buyer
     * @param _percentUpFront up front payment percentage given when both parties sign
+    * @param _tokenType //ERC20, ERC721 etc
+    * @param _transType the type/purpose of transaction ('resale' or 'consumption')
     */
-    event EscrowArbitrated(address _tokenAddress, uint256 _tokenID, address _arbiter, address _seller, address _buyer, uint256 _amountToSeller, uint256 _amountToBuyer, uint256 _paymentToSeller, uint256 _paymentToBuyer, uint256 _percentUpFront, bytes tokenType);
+    event EscrowArbitrated(address _tokenAddress, uint256 _tokenID, address _arbiter, address _seller, address _buyer, uint256 _amountToSeller, uint256 _amountToBuyer, uint256 _paymentToSeller, uint256 _paymentToBuyer, uint256 _percentUpFront, string _tokenType, string _transType);
 }
