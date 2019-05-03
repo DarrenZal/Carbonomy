@@ -21,6 +21,7 @@ contract EscrowERC20{
     string[] feeTypes;
     uint256[] fees;
     address[] feeAddresses;
+    address[] feeCreditAddresses;
     bool buyerDisputed;
     bool sellerDisputed;
 
@@ -41,6 +42,7 @@ contract EscrowERC20{
     function getfeeTypes() public view returns (string[] memory){ return feeTypes;}
     function getfees() public view returns (uint256[] memory){ return fees;}
     function getfeeAddresses() public view returns (address[] memory){ return feeAddresses;}
+    function getfeeCreditAddresses() public view returns (address[] memory){ return feeCreditAddresses;}
     function getBuyerDisputed() public view returns (bool){ return buyerDisputed;}
     function getSellerDisputed() public view returns (bool){ return sellerDisputed;}
 
@@ -55,9 +57,11 @@ contract EscrowERC20{
     * @param _transType type of transaction ex: "resale", "consumption", "import" 
     * @param _feeTypes types of fees included, corresponding to fees. ex: [carbon tax, sales tax, ..]
     * @param _fees fees included ex: [10, 100, ..]
+    * @param _feeCreditAddresses addresses of credits to use to offset fees (ex using carbon credits to offset carbon tax)
     */    
-    constructor(address[] memory _addresses, uint256 _amount, uint256 _price, uint256 _percentUpFront, bool _release, string memory _transType, string[] memory _feeTypes, uint256[] memory _fees) public payable {
+    constructor(address[] memory _addresses, uint256 _amount, uint256 _price, uint256 _percentUpFront, bool _release, string memory _transType, string[] memory _feeTypes, uint256[] memory _fees, address[] memory _feeCreditAddresses) public payable {
         require(0 <= _percentUpFront && _percentUpFront <= 100);
+        require(_fees.length == _feeTypes.length && _fees.length == _feeCreditAddresses.length);
         tokenAddress = _addresses[1];
         Token tokenInstance = Token(tokenAddress);
         seller = address(uint160(_addresses[3]));
@@ -70,6 +74,7 @@ contract EscrowERC20{
         for(uint a = 5; a < _addresses.length; a++){
             feeAddresses.push(_addresses[a]);
         }
+        feeCreditAddresses = _feeCreditAddresses;
         feeTypes = _feeTypes;
         fees = _fees;
 
@@ -86,6 +91,17 @@ contract EscrowERC20{
             for(uint i = 0; i < _fees.length; i++){
                 totalFees = SafeMath.add(totalFees, _fees[i]);
             }
+            if(_feeCreditAddresses.length == _fees.length){
+                //use credits to offset fees
+                for(uint j = 0; j < _feeCreditAddresses.length; j++){
+                    if(address(_feeCreditAddresses[j]) != address(0)){
+                        if(Token(_feeCreditAddresses[j]).allowance(msg.sender, address(this)) == _fees[j]){
+                            Token(_feeCreditAddresses[j]).transferFrom(msg.sender, address(this), _fees[j]);
+                            totalFees = SafeMath.sub(totalFees, _fees[j]);   
+                        }
+                    }
+                }
+            }
             require(msg.value == SafeMath.add(_price,totalFees));
             buyerSigned = true;
             buyerReleased = _release;
@@ -96,8 +112,15 @@ contract EscrowERC20{
         if((buyer == msg.sender || buyer == address(0)) && buyerSigned == false){
             if(fees.length > 0){
                 uint256 totalFees = 0;
-                for(uint l = 0; l < fees.length; l++){
-                    totalFees = SafeMath.add(totalFees, fees[l]);
+                for(uint j = 0; j < fees.length; j++){
+                    if(address(feeCreditAddresses[j]) != address(0)){  //use credits to offset fees
+                        if(Token(feeCreditAddresses[j]).allowance(msg.sender, address(this)) == fees[j]){
+                            Token(feeCreditAddresses[j]).transferFrom(msg.sender, address(this), fees[j]);
+                            totalFees = SafeMath.sub(totalFees, fees[j]);   
+                        }
+                    } else {
+                        totalFees = SafeMath.add(totalFees, fees[j]);
+                    }
                 }
                 require(msg.value == SafeMath.add(price, totalFees));
             } else {
@@ -136,14 +159,19 @@ contract EscrowERC20{
         }
         if(buyer == msg.sender && buyerSigned == true){
             buyerUnSigned = true;
-            if (buyerSigned == false){
+            if (sellerSigned == false){
                 //seller never signed, can refund buyer his money (minus percent paid up front) and delete the contract
                 //If tax was put in escrow up front, refund the tax as well
-                if(fees.length > 0){
-                    buyer.transfer(SafeMath.add(totalFees, SafeMath.div(SafeMath.mul(100-percentUpFront,price),100)));
-                } else {
-                    buyer.transfer(SafeMath.div(SafeMath.mul(100-percentUpFront,price),100));
+                //refund credits
+                for(uint j = 0; j < fees.length; j++){
+                    if(address(feeCreditAddresses[j]) != address(0)){
+                        if(Token(feeCreditAddresses[j]).balanceOf(address(this)) >= fees[j]){
+                            Token(feeCreditAddresses[j]).transfer(buyer, fees[j]);
+                            totalFees = SafeMath.sub(totalFees, fees[j]);   
+                        }
+                    }
                 }
+                buyer.transfer(SafeMath.add(totalFees, SafeMath.div(SafeMath.mul(100-percentUpFront,price),100)));
                 selfdestruct(msg.sender);
                 return true;
             }
@@ -151,7 +179,7 @@ contract EscrowERC20{
             sellerUnSigned = true;
             if (buyerSigned == false){
                 //buyer never signed, can refund seller his shares and delete the contract
-                    Token(tokenAddress).transfer(seller, quantity);
+                Token(tokenAddress).transfer(seller, quantity);
                 selfdestruct(msg.sender);
                 return true;
             }
@@ -160,7 +188,15 @@ contract EscrowERC20{
             //both parties have signed but then unsigned, can refund both and delete contract
             Token(tokenAddress).transfer(seller, quantity);
             //Buyer paid percentUpFront when they signed, so remove that from the refund
-            //If tax was put in escrow up front, refund the tax as well
+            //If credits and fees were put in escrow up front, refund those as well
+            for(uint j = 0; j < fees.length; j++){
+                if(address(feeCreditAddresses[j]) != address(0)){
+                    if(Token(feeCreditAddresses[j]).balanceOf(address(this)) >= fees[j]){
+                        Token(feeCreditAddresses[j]).transfer(buyer, fees[j]);
+                        totalFees = SafeMath.sub(totalFees, fees[j]);   
+                    }
+                }
+            }
             buyer.transfer(SafeMath.add(totalFees,SafeMath.div(SafeMath.mul(100-percentUpFront,price),100)));
             selfdestruct(msg.sender);
         }
@@ -180,17 +216,19 @@ contract EscrowERC20{
         }
         if(buyerReleased && sellerReleased){
             require(buyerDisputed == false && sellerDisputed == false);
-                 Token(tokenAddress).transfer(buyer, quantity);
+            Token(tokenAddress).transfer(buyer, quantity);
             //transfer funds to the seller minus how much was paid up front
             seller.transfer(SafeMath.div(SafeMath.mul(100-percentUpFront,price),100));
             //pay fees, which were collected when the buyer signed
-            if(fees.length > 0){
-                for(uint i = 0; i < fees.length; i++){
-                    address payable escrowTaxAddress = address(uint160(feeAddresses[i]));
+            for(uint i = 0; i < fees.length; i++){
+                address payable escrowTaxAddress = address(uint160(feeAddresses[i]));
+                if(feeCreditAddresses[i] != address(0)){
+                    Token(feeCreditAddresses[i]).transfer(escrowTaxAddress, fees[i]);
+                } else {
                     escrowTaxAddress.transfer( fees[i] );
                 }
             }
-            emit EscrowFinalized(tokenAddress, seller, buyer, price, quantity, percentUpFront, transType, feeTypes, fees, feeAddresses);
+            emit EscrowFinalized(tokenAddress, seller, buyer, price, quantity, percentUpFront, transType, feeTypes, fees, feeAddresses, feeCreditAddresses);
             selfdestruct(msg.sender);
         }
         return true;
@@ -214,7 +252,18 @@ contract EscrowERC20{
     function signAndReleaseEscrow() public payable returns (bool){
         if((buyer == msg.sender || buyer == address(0)) && buyerSigned == false){
             if(fees.length > 0){
-                require(msg.value == SafeMath.add(price, getFeeTotal()));
+                uint256 totalFees = 0;
+                for(uint j = 0; j < fees.length; j++){
+                    if(address(feeCreditAddresses[j]) != address(0)){  //use credits to offset fees
+                        if(Token(feeCreditAddresses[j]).allowance(msg.sender, address(this)) == fees[j]){
+                            Token(feeCreditAddresses[j]).transferFrom(msg.sender, address(this), fees[j]);
+                            totalFees = SafeMath.sub(totalFees, fees[j]);   
+                        }
+                    } else {
+                        totalFees = SafeMath.add(totalFees, fees[j]);
+                    }
+                }
+                require(msg.value == SafeMath.add(price, totalFees));
             } else {
                 require(msg.value == price);
             }
@@ -294,7 +343,7 @@ contract EscrowERC20{
     * @param _paymentToSeller funds to give seller
     * @param _paymentToBuyer funds to give seller
     */
-    function arbitrateEscrow(uint256 _amountToSeller, uint256 _amountToBuyer, uint256 _paymentToSeller, uint256 _paymentToBuyer) public returns (bool){
+    function arbitrateEscrow(uint256 _amountToSeller, uint256 _amountToBuyer, uint256 _paymentToSeller, uint256 _paymentToBuyer, uint256[] memory _feesToBuyer) public returns (bool){
         require(msg.sender == arbiter);
         require(buyerDisputed == true || sellerDisputed == true);
         if(buyerDisputed == false){
@@ -303,15 +352,25 @@ contract EscrowERC20{
             require(msg.sender != buyer);
         }
         require(buyerSigned == true && sellerSigned == true);
-        if(fees.length > 0){
-            uint256 totalFees = 0;
-            for(uint i = 0; i < fees.length; i++){
-                totalFees = SafeMath.add(totalFees, fees[i]);
+        require(fees.length == feeCreditAddresses.length);
+        uint256 totalPaymentToBuyer = _paymentToBuyer;
+        for(uint i = 0; i < fees.length; i++){
+            if(_feesToBuyer[i] == fees[i]){ //this fee should be refunded to buyer 
+                if(address(feeCreditAddresses[i]) != address(0)){ //refund credit
+                    Token(feeCreditAddresses[i]).transfer(buyer, fees[i]);
+                } else { //fee is denominated in Ether and is intended to be refunded to buyer, add to totalFeesToBuyer
+                    totalPaymentToBuyer = SafeMath.add(totalPaymentToBuyer, fees[i]); 
+                }
+            } else { //give fee to fee collector
+                if(address(feeCreditAddresses[i]) != address(0)){ //refund credit
+                    Token(feeCreditAddresses[i]).transfer(feeCreditAddresses[i], fees[i]);
+                } else {
+                    address payable escrowTaxAddress = address(uint160(feeAddresses[i]));
+                    escrowTaxAddress.transfer(fees[i]);
+                }
             }
-            require(_paymentToSeller + _paymentToBuyer == SafeMath.add(SafeMath.div(SafeMath.mul(100-percentUpFront,price),100),totalFees));
-        } else {
-            require(_paymentToSeller + _paymentToBuyer == SafeMath.div(SafeMath.mul(100-percentUpFront,price),100));
         }
+        require(_paymentToSeller + _paymentToBuyer == SafeMath.div(SafeMath.mul(100-percentUpFront,price),100));
         require(_amountToSeller + _amountToBuyer == quantity);
         if(_paymentToSeller > 0){
             seller.transfer(_paymentToSeller);
@@ -321,10 +380,10 @@ contract EscrowERC20{
             } else if(_amountToBuyer > 0){
                 Token(tokenAddress).transfer(buyer, _amountToBuyer);
             }
-        if(_paymentToBuyer > 0){
-            buyer.transfer(_paymentToBuyer);
+        if(totalPaymentToBuyer > 0){
+            buyer.transfer(totalPaymentToBuyer);
         }
-        emit EscrowArbitrated(tokenAddress, arbiter, seller, buyer, _amountToSeller, _amountToBuyer, _paymentToSeller, _paymentToBuyer, percentUpFront, transType);
+        emit EscrowArbitrated(tokenAddress, arbiter, seller, buyer, _amountToSeller, _amountToBuyer, _paymentToSeller, _paymentToBuyer, fees, _feesToBuyer, percentUpFront, transType);
         selfdestruct(msg.sender);
         return true;
     }
@@ -341,8 +400,9 @@ contract EscrowERC20{
     * @param _feeTypes description of the tax
     * @param _fees tax payment in ether
     * @param _feeAddresses tax collection address
+    * @param _feeCreditAddresses addresses of credits to use to offset fees (ex using carbon credits to offset carbon
     */
-    event EscrowFinalized(address _tokenAddress, address _seller, address _buyer, uint256 _price, uint256 _amount, uint256 _percentUpFront, string _transType, string[] _feeTypes, uint256[] _fees, address[] _feeAddresses);
+    event EscrowFinalized(address _tokenAddress, address _seller, address _buyer, uint256 _price, uint256 _amount, uint256 _percentUpFront, string _transType, string[] _feeTypes, uint256[] _fees, address[] _feeAddresses, address[] _feeCreditAddresses);
 
     /**
     * Event for recording arbitration of a contract
@@ -354,9 +414,12 @@ contract EscrowERC20{
     * @param _amountToBuyer Amount of ownership tokens to give buyer
     * @param _paymentToSeller funds to give seller
     * @param _paymentToBuyer funds to give buyer
+    * @param _fees the fees included
+    * @param _feesToBuyer fees which were refunded to buyer
     * @param _percentUpFront up front payment percentage given when both parties sign
     * @param _transType the type/purpose of transaction ('resale' or 'consumption')
     */
-    event EscrowArbitrated(address _tokenAddress, address _arbiter, address _seller, address _buyer, uint256 _amountToSeller, uint256 _amountToBuyer, uint256 _paymentToSeller, uint256 _paymentToBuyer, uint256 _percentUpFront, string _transType);
+    event EscrowArbitrated(address _tokenAddress, address _arbiter, address _seller, address _buyer, uint256 _amountToSeller, uint256 _amountToBuyer, uint256 _paymentToSeller, uint256 _paymentToBuyer, uint256[] _fees, uint256[] _feesToBuyer, uint256 _percentUpFront, string _transType);
 }
+
 
