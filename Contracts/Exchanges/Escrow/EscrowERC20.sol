@@ -1,6 +1,6 @@
 pragma solidity ^0.5.00;
-import "../SafeMath.sol";
-import "../Fungible/Token.sol";
+import "../../SafeMath.sol";
+import "../../Fungible/Token.sol";
 pragma experimental ABIEncoderV2;
 
 contract EscrowERC20{
