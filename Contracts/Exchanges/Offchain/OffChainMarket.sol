@@ -7,7 +7,7 @@ import "../../NonFungible/ERC721.sol"; //non-fungible
 import "./ECDSA.sol";
 pragma experimental ABIEncoderV2;
 
-contract OffchainMarket{
+contract OffChainMarket{
     using ECDSA for bytes32;
 
     mapping(address => mapping(uint256 => bool)) seenNonces;
