@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.00;
 
 contract Entity{
     mapping(address => entity) entities; //maps an address to an entity object
@@ -14,7 +14,7 @@ contract Entity{
     /**
     * @dev allows entity registration
     */
-    function register(string _businessName, string jurisdiction) public returns (bool){
+    function register(string memory _businessName, string memory jurisdiction) public returns (bool){
         require(entities[msg.sender].registered == false);
         entities[msg.sender].businessName = _businessName;
         entities[msg.sender].jurisdiction = jurisdiction;
@@ -29,7 +29,6 @@ contract Entity{
     function unRegister(uint _index) public returns (bool){
         require(entities[msg.sender].registered == true);
         require(entityAddresses[_index] == msg.sender);
-        if (removeEntity(_index) == false) return false; //remove from list of registered entities
         entities[msg.sender].registered = false;
     }
 
@@ -43,14 +42,14 @@ contract Entity{
     /**
     * @dev returns entity jurisdiction
     */
-    function getJurisdiction(address _address) public view returns (string){
+    function getJurisdiction(address _address) public view returns (string memory){
         return entities[_address].jurisdiction;
     }
     
     /**
     * @dev allows changing of entity jurisdiction
     */
-    function changeJurisdiction(string _jurisdiction) public view returns (string){
+    function changeJurisdiction(string memory _jurisdiction) public returns (string memory){
         entities[msg.sender].jurisdiction = _jurisdiction;
         return entities[msg.sender].jurisdiction;
     }
@@ -58,14 +57,14 @@ contract Entity{
     /**
     * @dev returns entity business name
     */
-    function getBusinessName(address _address) public view returns (string){
+    function getBusinessName(address _address) public view returns (string memory){
         return entities[_address].businessName;
     }
     
     /**
     * @dev allows changing of entity business name
     */
-    function changeBusinessName(string _businessName) public view returns (string){
+    function changeBusinessName(string memory _businessName) public returns (string memory){
         entities[msg.sender].businessName = _businessName;
         return entities[msg.sender].businessName;
     }
@@ -73,22 +72,8 @@ contract Entity{
     /**
     * @dev returns registered entities
     */
-    function getEntities() public view returns (address[]){
+    function getEntities() public view returns (address[] memory){
         return entityAddresses;
     }
-    
-    /**
-    * @dev removes entity from list of registered entities
-    * @param _index the index of the Entity to remove
-    */
-    function removeEntity(uint _index) internal returns (bool){
-        require(_index < entityAddresses.length);
-        if (_index >= entityAddresses.length) return;
-        for (uint i = _index; i<entityAddresses.length-1; i++){
-            entityAddresses[i] = entityAddresses[i+1];
-        }
-        delete entityAddresses[entityAddresses.length-1];
-        entityAddresses.length--;
-        return true;
-    }
 }
+
