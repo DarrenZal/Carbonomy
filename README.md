@@ -1,4 +1,4 @@
 # Carbonomy
 Virtual carbon economy
 
-![Diagram](https://github.com/DarrenZal/Carbonomy/blob/master/Diagram.pdf)
+![Carbonomy](https://github.com/DarrenZal/Carbonomy/blob/master/Carbonomy.pdf)
