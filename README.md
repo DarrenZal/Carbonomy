@@ -1,5 +1,5 @@
 # Carbonomy
-This project is meant to explore the design of a new carbon economy.
+This project is meant to explore the design of a new economy.
 
 The present economy lacks accountability for social and environmental costs of emiting carbon into the air.
 
