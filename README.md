@@ -11,7 +11,7 @@ By using blockchain technology as the platform to track carbon, economic tools s
 
 So far, the project consists of a collection of Ethereum 'smart contracts', which can interact with each other and with external entities in an economy.
 
-Below is a diagram of how these contracts can interact with each other.
+Below is an abstract diagram of how these contracts can interact with each other.
 
 
 ![Carbonomy](https://github.com/DarrenZal/Carbonomy/blob/master/Carbonomy.jpg)
