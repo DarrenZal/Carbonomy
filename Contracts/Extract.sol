@@ -66,7 +66,7 @@ contract Extract is Well, Entity, Materials{
     }
     
     /**
-    * Event for recording a well de-activation
+    * Event for recording extraction from a well
     * @param _entity the entity recording extraction 
     * @param _wellID the well ID
     * @param _materialAddress the address of material contract
