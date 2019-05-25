@@ -1,5 +1,5 @@
 pragma solidity ^0.5.00;
-import "browser/EscrowERC20.sol"; //fungible
+import "./EscrowERC20.sol"; //fungible
 pragma experimental ABIEncoderV2;
 
 contract EscrowERC20Factory {
