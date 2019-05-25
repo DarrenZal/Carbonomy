@@ -9,7 +9,7 @@ Carbonomy allows these costs to be accounted for in a transparent way by using a
 
 By using blockchain technology as the platform to track carbon, economic tools such as carbon taxes, cap-and-trade, fee-and-dividend, and others can be easily integrated to account for carbon emissions.
 
-So far, the project consists of a collection of Ethereum 'smart contracts', which can interact with each other and with external entities in an economic system.
+So far, the project consists of a collection of Ethereum 'smart contracts', which can interact with each other and with external entities in an economy.
 
 Below is a diagram of how these contracts can interact with each other.
 
