@@ -4,9 +4,9 @@
 //the stamp would be transfered along with the gas when they sell the gas to a gas station.
 //If tax is paid up stream, 'proof of tax paid' can be carried down the supply chain.
 
-pragma solidity ^0.4.24;
-import "./SafeMath.sol";
-import "./Fungible/FungibleToken.sol";
+pragma solidity ^0.5.0;
+import "browser/SafeMath.sol";
+import "browser/Token.sol";
 
 contract Stamp{
     address owner;
@@ -14,7 +14,7 @@ contract Stamp{
     //account => token => stamp type => balance
     mapping (address => mapping (address => mapping (string => uint256))) stampBalance;
     
-    function Stamp(address _caller) {
+    constructor(address _caller) public {
         owner = msg.sender;
     }
     
@@ -28,7 +28,7 @@ contract Stamp{
     * @param _token material which has been stamped
     * @param _stampType type of stamp, ex "carbonTax"
     */
-    function getStampBalance(address _account, address _token, string _stampType) public view returns (uint256){
+    function getStampBalance(address _account, address _token, string memory _stampType) public view returns (uint256){
         return stampBalance[_account][_token][_stampType];
     }
 
@@ -38,7 +38,7 @@ contract Stamp{
     * @param _token token/material getting the stamp
     * @param _stampType type of stamp, ex "carbonTax"
     */
-    function stamp(address _account, address _token, string _stampType, uint256 _balance) public returns (bool){
+    function stamp(address _account, address _token, string memory _stampType, uint256 _balance) public returns (bool){
         require(msg.sender == owner);
         stampBalance[_account][_token][_stampType] = SafeMath.add(stampBalance[_account][_token][_stampType], _balance);
         emit Stamped(_account, _token, _stampType, _balance);
@@ -52,8 +52,26 @@ contract Stamp{
     * @param _token token/material which has the stamp
     * @param _stampType type of stamp, ex "carbonTax"
     */
-    function transferStamp(address _accountFrom, address _accountTo, address _token, string _stampType, uint256 _balance) public returns (bool){
-        require(msg.sender == owner);
+    function transferStamp(address _accountFrom, address _accountTo, address _token, string memory _stampType, uint256 _balance) public returns (bool){
+        require(SafeMath.sub(stampBalance[_accountFrom][_token][_stampType], _balance) >= 0);
+        stampBalance[_accountFrom][_token][_stampType] = SafeMath.sub(stampBalance[_accountFrom][_token][_stampType], _balance);
+        stampBalance[_accountTo][_token][_stampType] = SafeMath.add(stampBalance[_accountTo][_token][_stampType], _balance);
+        emit TransferStamp(_accountFrom, _accountTo, _token, _stampType, _balance);
+        return true;
+    }
+    
+    /**
+    * @dev allows the token and the stamp for that token to be transferred in a single transaction
+    * @param _accountFrom the address sending the stamp
+    * @param _accountTo the address recieving the stamp
+    * @param _token token/material which has the stamp
+    * @param _stampType type of stamp, ex "carbonTax"
+    */
+    function transferTokenAndStamp(address _accountFrom, address _accountTo, address _token, string memory _stampType, uint256 _balance) public returns (bool){
+        require(Token(_token).balanceOf(msg.sender) >= _balance);
+        require(Token(_token).allowance(msg.sender, address(this)) >= _balance);
+        require(SafeMath.sub(stampBalance[_accountFrom][_token][_stampType], _balance) >= 0);
+        Token(_token).transferFrom(msg.sender, _accountTo, _balance);
         stampBalance[_accountFrom][_token][_stampType] = SafeMath.sub(stampBalance[_accountFrom][_token][_stampType], _balance);
         stampBalance[_accountTo][_token][_stampType] = SafeMath.add(stampBalance[_accountTo][_token][_stampType], _balance);
         emit TransferStamp(_accountFrom, _accountTo, _token, _stampType, _balance);
