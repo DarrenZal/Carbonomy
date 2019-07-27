@@ -1,5 +1,7 @@
-pragma solidity ^0.4.24;
-import "./SafeMath.sol";
+//Oil well twin with internal ID, external ID, ownership, registration, and activation.
+
+pragma solidity ^0.5.00;
+import "browser/SafeMath.sol";
 
 contract Well{
     mapping(uint256 => well) wells;
@@ -31,8 +33,8 @@ contract Well{
     /**
     * @dev returns data for a well
     */
-    function getWellData(uint256 _wellID) public returns (address, bool, address[], uint256[], uint256){
-        well thisWell = wells[_wellID];
+    function getWellData(uint256  _wellID) public returns ( address , bool, address[] memory,  uint256[] memory, uint256 ){
+        well storage thisWell = wells[_wellID];
         return (thisWell.owner, thisWell.active, thisWell.materials, thisWell.extracted, thisWell.externalID);
     }
     
