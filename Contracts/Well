@@ -1,14 +1,15 @@
 //Oil well twin with internal ID, external ID, ownership, registration, and activation.
 
 pragma solidity ^0.5.00;
-import "browser/SafeMath.sol";
 
 contract Well{
     mapping(uint256 => well) wells;
-    uint256 wellCounter; //number of wells registered
+    uint256 wellCounter = 0;
+    address public creator;
 
     struct well{
         uint256 ID;
+        uint256 location;
         address owner;
         bool active;
         address[] materials;
@@ -17,12 +18,17 @@ contract Well{
         uint256 externalID; //legacy ID
     }
     
+    constructor(address _creator) public {
+        creator = _creator;
+    }
+    
     /**
     * @dev register a well
     */
-    function registerWell(uint256 _externalID, address _owner, bool _active) public returns (bool){
+    function registerWell(uint256 _externalID, uint256 _location, address _owner, bool _active) public returns (bool){
         wellCounter++;
         wells[wellCounter].ID = wellCounter;
+        wells[wellCounter].location = _location;
         wells[wellCounter].owner = _owner;
         wells[wellCounter].active = _active;
         wells[wellCounter].externalID = _externalID;
@@ -33,9 +39,9 @@ contract Well{
     /**
     * @dev returns data for a well
     */
-    function getWellData(uint256  _wellID) public returns ( address , bool, address[] memory,  uint256[] memory, uint256 ){
-        well storage thisWell = wells[_wellID];
-        return (thisWell.owner, thisWell.active, thisWell.materials, thisWell.extracted, thisWell.externalID);
+    function getWellData(uint256  _wellID) public view returns ( address , bool, address[] memory,  uint256[] memory, uint256, uint256){
+        well memory thisWell = wells[_wellID];
+        return (thisWell.owner, thisWell.active, thisWell.materials, thisWell.extracted, thisWell.externalID, thisWell.location);
     }
     
     /**
@@ -122,3 +128,4 @@ contract Well{
     */
     event DeActivateWell(uint256 _wellID);
 }
+
