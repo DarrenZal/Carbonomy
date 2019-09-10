@@ -1,28 +1,43 @@
 //This contract allows entites to extract materials, which are represented as fungible tokens
 //Ex: An oil company could use this to record extraction of oil
 
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.00;
 import "./SafeMath.sol";
 import "./Well.sol";
-import "./Entity.sol";
 import "./Fungible/Materials.sol";
 import "./Fungible/FungibleToken.sol";
 
-contract Extract is Well, Entity, Materials{
+interface Entity{
+    /**
+     * @dev returns registration data for a entity given the address
+     * @param _entityAddress entity address
+     *
+     */
+    function isEntityRegistered(address  _entityAddress) external view returns (bool);
+}
+
+contract Extract is Well, Materials{
+    address public creator;
+    
+    constructor(address _creator) public {
+        creator = _creator;
+    }
     
     /**
     * @dev record oil extraction from a well
+    * @param _identityContract the contract which keeps track of registered entities (allowed to ectract)
     * @param _wellID the ID of the well
     * @param _tokenName Human readable name/description of the material
     * @param _decimalUnits Amount of decimals for display purposes
     * @param _tokenSymbol Symbol for display purposes
     * @param _amount quantity of extraction
     */
-    function recordExtractionNewMaterial(uint256 _wellID, string _tokenName, uint8 _decimalUnits, string _tokenSymbol, uint256 _amount) public returns (bool){
+    function recordExtractionNewMaterial(address _identityContract, uint256 _wellID, string memory _tokenName, uint8 _decimalUnits, string memory _tokenSymbol, uint256 _amount) public returns (bool){
         well storage thisWell = wells[_wellID];
-        require(wells[_wellID].owner == msg.sender);
-        require(wells[_wellID].active == true);
-        require(entities[msg.sender].registered == true);
+        require(thisWell.owner == msg.sender);
+        require(thisWell.active == true);
+        bool entityRegistered = Entity(_identityContract).isEntityRegistered(msg.sender);
+        require(entityRegistered == true);
         address materialAddress = addNewMaterial( _tokenName,  _decimalUnits,  _tokenSymbol);
         FungibleToken thisMaterial = FungibleToken(materialAddress);
         //below should call the function as owner, allowing adding to the balance of the address of the caller if this function (msg.sender)
@@ -38,16 +53,18 @@ contract Extract is Well, Entity, Materials{
     
     /**
     * @dev record oil extraction from a well
+    * @param _identityContract the contract which keeps track of registered entities (allowed to ectract)
     * @param _wellID address of the well
     * @param _materialAddress address of the material extracted
     * @param _wellMaterialIndex index of the material within the well's ledger of materials it has extracted before
     * @param _amount quantity of extraction
     */
-    function recordExtractionOldMaterial(uint256 _wellID, address _materialAddress, uint _wellMaterialIndex, uint256 _amount) public returns (bool){
+    function recordExtractionOldMaterial(address _identityContract, uint256 _wellID, address _materialAddress, uint _wellMaterialIndex, uint256 _amount) public returns (bool){
         well storage thisWell = wells[_wellID];
-        require(wells[_wellID].owner == msg.sender);
-        require(wells[_wellID].active == true);
-        require(entities[msg.sender].registered == true);
+        require(thisWell.owner == msg.sender);
+        require(thisWell.active == true);
+        bool entityRegistered = Entity(_identityContract).isEntityRegistered(msg.sender);
+        require(entityRegistered == true);
         if(thisWell.previouslyExtracted[_materialAddress] == true){ //this well has extracted this material before.
             require(thisWell.materials[_wellMaterialIndex] == _materialAddress);
             FungibleToken thisMaterial = FungibleToken(_materialAddress);
@@ -66,7 +83,7 @@ contract Extract is Well, Entity, Materials{
     }
     
     /**
-    * Event for recording extraction from a well
+    * Event for recording a well de-activation
     * @param _entity the entity recording extraction 
     * @param _wellID the well ID
     * @param _materialAddress the address of material contract
