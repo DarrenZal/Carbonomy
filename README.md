@@ -1,7 +1,7 @@
 # Carbonomy
 This project is meant to explore the design of a new carbon economy.
 
-A carbon economy is defined here as the production, distribution, trade, consumption, taxation, and other means of managing carbon intensive goods and services. 
+A carbon economy is the production, distribution, trade, consumption, taxation, and other means of managing carbon intensive goods and services. 
 
 The present economy lacks accountability for social and environmental costs of emiting carbon into the air.
 
